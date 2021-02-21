@@ -37,6 +37,7 @@ type samplesAppender struct {
 	agg          aggregator.Aggregator
 	clientRemote client.Client
 
+	dropTs          bool
 	unownedID       []byte
 	stagedMetadatas metadata.StagedMetadatas
 }
@@ -44,7 +45,7 @@ type samplesAppender struct {
 // Ensure samplesAppender implements SamplesAppender.
 var _ SamplesAppender = (*samplesAppender)(nil)
 
-func (a samplesAppender) AppendCounterSample(value int64) error {
+func (a samplesAppender) AppendUntimedCounterSample(value int64) error {
 	if a.clientRemote != nil {
 		// Remote client write instead of local aggregation.
 		sample := unaggregated.Counter{
@@ -62,7 +63,7 @@ func (a samplesAppender) AppendCounterSample(value int64) error {
 	return a.agg.AddUntimed(sample, a.stagedMetadatas)
 }
 
-func (a samplesAppender) AppendGaugeSample(value float64) error {
+func (a samplesAppender) AppendUntimedGaugeSample(value float64) error {
 	if a.clientRemote != nil {
 		// Remote client write instead of local aggregation.
 		sample := unaggregated.Gauge{
@@ -80,7 +81,28 @@ func (a samplesAppender) AppendGaugeSample(value float64) error {
 	return a.agg.AddUntimed(sample, a.stagedMetadatas)
 }
 
-func (a *samplesAppender) AppendCounterTimedSample(t time.Time, value int64) error {
+func (a samplesAppender) AppendUntimedTimerSample(value float64) error {
+	if a.clientRemote != nil {
+		// Remote client write instead of local aggregation.
+		sample := unaggregated.BatchTimer{
+			ID:     a.unownedID,
+			Values: []float64{value},
+		}
+		return a.clientRemote.WriteUntimedBatchTimer(sample, a.stagedMetadatas)
+	}
+
+	sample := unaggregated.MetricUnion{
+		Type:          metric.TimerType,
+		ID:            a.unownedID,
+		BatchTimerVal: []float64{value},
+	}
+	return a.agg.AddUntimed(sample, a.stagedMetadatas)
+}
+
+func (a *samplesAppender) AppendCounterSample(t time.Time, value int64) error {
+	if a.dropTs {
+		return a.AppendUntimedCounterSample(value)
+	}
 	return a.appendTimedSample(aggregated.Metric{
 		Type:      metric.CounterType,
 		ID:        a.unownedID,
@@ -89,7 +111,10 @@ func (a *samplesAppender) AppendCounterTimedSample(t time.Time, value int64) err
 	})
 }
 
-func (a *samplesAppender) AppendGaugeTimedSample(t time.Time, value float64) error {
+func (a *samplesAppender) AppendGaugeSample(t time.Time, value float64) error {
+	if a.dropTs {
+		return a.AppendUntimedGaugeSample(value)
+	}
 	return a.appendTimedSample(aggregated.Metric{
 		Type:      metric.GaugeType,
 		ID:        a.unownedID,
@@ -98,7 +123,10 @@ func (a *samplesAppender) AppendGaugeTimedSample(t time.Time, value float64) err
 	})
 }
 
-func (a *samplesAppender) AppendTimerTimedSample(t time.Time, value float64) error {
+func (a *samplesAppender) AppendTimerSample(t time.Time, value float64) error {
+	if a.dropTs {
+		return a.AppendUntimedTimerSample(value)
+	}
 	return a.appendTimedSample(aggregated.Metric{
 		Type:      metric.TimerType,
 		ID:        a.unownedID,
@@ -137,42 +165,50 @@ func (a *multiSamplesAppender) addSamplesAppender(v samplesAppender) {
 	a.appenders = append(a.appenders, v)
 }
 
-func (a *multiSamplesAppender) AppendCounterSample(value int64) error {
+func (a *multiSamplesAppender) AppendUntimedCounterSample(value int64) error {
 	var multiErr xerrors.MultiError
 	for _, appender := range a.appenders {
-		multiErr = multiErr.Add(appender.AppendCounterSample(value))
+		multiErr = multiErr.Add(appender.AppendUntimedCounterSample(value))
 	}
 	return multiErr.LastError()
 }
 
-func (a *multiSamplesAppender) AppendGaugeSample(value float64) error {
+func (a *multiSamplesAppender) AppendUntimedGaugeSample(value float64) error {
 	var multiErr xerrors.MultiError
 	for _, appender := range a.appenders {
-		multiErr = multiErr.Add(appender.AppendGaugeSample(value))
+		multiErr = multiErr.Add(appender.AppendUntimedGaugeSample(value))
 	}
 	return multiErr.LastError()
 }
 
-func (a *multiSamplesAppender) AppendCounterTimedSample(t time.Time, value int64) error {
+func (a *multiSamplesAppender) AppendUntimedTimerSample(value float64) error {
 	var multiErr xerrors.MultiError
 	for _, appender := range a.appenders {
-		multiErr = multiErr.Add(appender.AppendCounterTimedSample(t, value))
+		multiErr = multiErr.Add(appender.AppendUntimedTimerSample(value))
 	}
 	return multiErr.LastError()
 }
 
-func (a *multiSamplesAppender) AppendGaugeTimedSample(t time.Time, value float64) error {
+func (a *multiSamplesAppender) AppendCounterSample(t time.Time, value int64) error {
 	var multiErr xerrors.MultiError
 	for _, appender := range a.appenders {
-		multiErr = multiErr.Add(appender.AppendGaugeTimedSample(t, value))
+		multiErr = multiErr.Add(appender.AppendCounterSample(t, value))
 	}
 	return multiErr.LastError()
 }
 
-func (a *multiSamplesAppender) AppendTimerTimedSample(t time.Time, value float64) error {
+func (a *multiSamplesAppender) AppendGaugeSample(t time.Time, value float64) error {
 	var multiErr xerrors.MultiError
 	for _, appender := range a.appenders {
-		multiErr = multiErr.Add(appender.AppendTimerTimedSample(t, value))
+		multiErr = multiErr.Add(appender.AppendGaugeSample(t, value))
+	}
+	return multiErr.LastError()
+}
+
+func (a *multiSamplesAppender) AppendTimerSample(t time.Time, value float64) error {
+	var multiErr xerrors.MultiError
+	for _, appender := range a.appenders {
+		multiErr = multiErr.Add(appender.AppendTimerSample(t, value))
 	}
 	return multiErr.LastError()
 }

@@ -80,11 +80,12 @@ type SamplesAppenderOverrideRules struct {
 // SamplesAppender is a downsampling samples appender,
 // that can only be called by a single caller at a time.
 type SamplesAppender interface {
-	AppendCounterSample(value int64) error
-	AppendGaugeSample(value float64) error
-	AppendCounterTimedSample(t time.Time, value int64) error
-	AppendGaugeTimedSample(t time.Time, value float64) error
-	AppendTimerTimedSample(t time.Time, value float64) error
+	AppendUntimedCounterSample(value int64) error
+	AppendUntimedGaugeSample(value float64) error
+	AppendUntimedTimerSample(value float64) error
+	AppendCounterSample(t time.Time, value int64) error
+	AppendGaugeSample(t time.Time, value float64) error
+	AppendTimerSample(t time.Time, value float64) error
 }
 
 type downsampler struct {

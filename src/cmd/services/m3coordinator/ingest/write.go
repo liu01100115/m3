@@ -274,7 +274,7 @@ func (d *downsamplerAndWriter) writeToDownsampler(
 	}
 
 	for _, dp := range datapoints {
-		err := result.SamplesAppender.AppendGaugeTimedSample(dp.Timestamp, dp.Value)
+		err := result.SamplesAppender.AppendGaugeSample(dp.Timestamp, dp.Value)
 		if err != nil {
 			return result.IsDropPolicyApplied, err
 		}
@@ -497,11 +497,11 @@ func (d *downsamplerAndWriter) writeAggregatedBatch(
 		for _, dp := range value.Datapoints {
 			switch value.Attributes.M3Type {
 			case ts.M3MetricTypeGauge:
-				err = result.SamplesAppender.AppendGaugeTimedSample(dp.Timestamp, dp.Value)
+				err = result.SamplesAppender.AppendGaugeSample(dp.Timestamp, dp.Value)
 			case ts.M3MetricTypeCounter:
-				err = result.SamplesAppender.AppendCounterTimedSample(dp.Timestamp, int64(dp.Value))
+				err = result.SamplesAppender.AppendCounterSample(dp.Timestamp, int64(dp.Value))
 			case ts.M3MetricTypeTimer:
-				err = result.SamplesAppender.AppendTimerTimedSample(dp.Timestamp, dp.Value)
+				err = result.SamplesAppender.AppendTimerSample(dp.Timestamp, dp.Value)
 			}
 			if err != nil {
 				// If we see an error break out so we can try processing the
