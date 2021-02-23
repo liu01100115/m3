@@ -154,15 +154,6 @@ type BaseResults interface {
 	// TotalDocsCount returns the total number of documents observed.
 	TotalDocsCount() int
 
-	// TotalDuration is the total ResultDurations for the query.
-	TotalDuration() ResultDurations
-
-	// AddBlockProcessingDuration adds the processing duration for a single block to the TotalDuration.
-	AddBlockProcessingDuration(duration time.Duration)
-
-	// AddBlockSearchDuration adds the search duration for a single block to the TotalDuration.
-	AddBlockSearchDuration(duration time.Duration)
-
 	// EnforceLimits returns whether this should enforce and increment limits.
 	EnforceLimits() bool
 
@@ -423,9 +414,10 @@ type Block interface {
 	QueryWithIter(
 		ctx context.Context,
 		opts QueryOptions,
-		docIter doc.Iterator,
+		docIter doc.QueryDocIterator,
 		results DocumentResults,
 		limit int,
+		logFields []opentracinglog.Field,
 	) error
 
 	// QueryIter returns a new QueryDocIterator for the query.
@@ -448,6 +440,7 @@ type Block interface {
 		opts QueryOptions,
 		results AggregateResults,
 		limit int,
+		logFields []opentracinglog.Field,
 	) error
 
 	// AggregateIter returns a new AggregatorIterator.

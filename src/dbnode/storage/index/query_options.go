@@ -43,7 +43,7 @@ func (o QueryOptions) LimitsExceeded(seriesCount, docsCount int) bool {
 	return o.SeriesLimitExceeded(seriesCount) || o.DocsLimitExceeded(docsCount)
 }
 
-func (o QueryOptions) exhaustive(seriesCount, docsCount int) bool {
+func (o QueryOptions) Exhaustive(seriesCount, docsCount int) bool {
 	return !o.SeriesLimitExceeded(seriesCount) && !o.DocsLimitExceeded(docsCount)
 }
 

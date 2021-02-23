@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sync"
 	"time"
 
@@ -40,7 +39,6 @@ import (
 	"github.com/m3db/m3/src/m3ninx/persist"
 	"github.com/m3db/m3/src/m3ninx/search"
 	"github.com/m3db/m3/src/m3ninx/search/executor"
-	"github.com/m3db/m3/src/m3ninx/x"
 	"github.com/m3db/m3/src/x/context"
 	xerrors "github.com/m3db/m3/src/x/errors"
 	"github.com/m3db/m3/src/x/ident"
@@ -48,7 +46,6 @@ import (
 	xresource "github.com/m3db/m3/src/x/resource"
 	xtime "github.com/m3db/m3/src/x/time"
 
-	"github.com/opentracing/opentracing-go"
 	opentracinglog "github.com/opentracing/opentracing-go/log"
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
@@ -426,48 +423,9 @@ func (b *block) Query(
 	results DocumentResults,
 	logFields []opentracinglog.Field,
 ) (bool, error) {
-	ctx, sp := ctx.StartTraceSpan(tracepoint.BlockQuery)
-	sp.LogFields(logFields...)
-	defer sp.Finish()
-
-	start := time.Now()
-	exhaustive, err := b.queryWithSpan(ctx, query, opts, results)
-	if err != nil {
-		sp.LogFields(opentracinglog.Error(err))
-	}
-	results.AddBlockProcessingDuration(time.Since(start))
-	return exhaustive, err
+	return false, nil
 }
 
-func (b *block) queryWithSpan(
-	ctx context.Context,
-	query Query,
-	opts QueryOptions,
-	results DocumentResults,
-) (bool, error) {
-	iter, err := b.QueryIter(ctx, query)
-	if err != nil {
-		return false, err
-	}
-
-	iterCloser := x.NewSafeCloser(iter)
-	defer func() {
-		_ = iterCloser.Close()
-		b.metrics.queryDocsMatched.RecordValue(float64(results.TotalDocsCount()))
-		b.metrics.querySeriesMatched.RecordValue(float64(results.Size()))
-	}()
-
-	if err := b.QueryWithIter(ctx, opts, iter, results, math.MaxInt64); err != nil {
-		return false, err
-	}
-
-	if err := iterCloser.Close(); err != nil {
-		return false, err
-	}
-	results.AddBlockSearchDuration(iter.SearchDuration())
-
-	return opts.exhaustive(results.Size(), results.TotalDocsCount()), nil
-}
 
 func (b *block) QueryIter(ctx context.Context, query Query) (doc.QueryDocIterator, error) {
 	b.RLock()
@@ -501,7 +459,31 @@ func (b *block) QueryIter(ctx context.Context, query Query) (doc.QueryDocIterato
 func (b *block) QueryWithIter(
 	ctx context.Context,
 	opts QueryOptions,
-	docIter doc.Iterator,
+	docIter doc.QueryDocIterator,
+	results DocumentResults,
+	limit int,
+	logFields []opentracinglog.Field,
+) error {
+	ctx, sp := ctx.StartTraceSpan(tracepoint.BlockQuery)
+	sp.LogFields(logFields...)
+	defer sp.Finish()
+
+	err := b.queryWithSpan(ctx, opts, docIter, results, limit)
+
+	if err != nil {
+		sp.LogFields(opentracinglog.Error(err))
+	}
+	if docIter.Done() {
+		b.metrics.queryDocsMatched.RecordValue(float64(results.TotalDocsCount()))
+		b.metrics.querySeriesMatched.RecordValue(float64(results.Size()))
+	}
+	return err
+}
+
+func (b *block) queryWithSpan(
+	ctx context.Context,
+	opts QueryOptions,
+	docIter doc.QueryDocIterator,
 	results DocumentResults,
 	limit int,
 ) error {
@@ -617,44 +599,7 @@ func (b *block) Aggregate(
 	results AggregateResults,
 	logFields []opentracinglog.Field,
 ) (bool, error) {
-	ctx, sp := ctx.StartTraceSpan(tracepoint.BlockAggregate)
-	sp.LogFields(logFields...)
-	defer sp.Finish()
-
-	start := time.Now()
-	exhaustive, err := b.aggregateWithSpan(ctx, opts, results, sp)
-	if err != nil {
-		sp.LogFields(opentracinglog.Error(err))
-	}
-	results.AddBlockProcessingDuration(time.Since(start))
-
-	return exhaustive, err
-}
-
-func (b *block) aggregateWithSpan(
-	ctx context.Context,
-	opts QueryOptions,
-	results AggregateResults,
-	sp opentracing.Span,
-) (bool, error) {
-	iter, err := b.AggregateIter(ctx, results.AggregateResultsOptions())
-	if err != nil {
-		return false, err
-	}
-
-	defer func() {
-		_ = iter.Close()
-		b.metrics.aggregateDocsMatched.RecordValue(float64(results.TotalDocsCount()))
-		b.metrics.aggregateSeriesMatched.RecordValue(float64(results.Size()))
-	}()
-
-	if err := b.AggregateWithIter(ctx, iter, opts, results, math.MaxInt64); err != nil {
-		return false, err
-	}
-
-	results.AddBlockSearchDuration(iter.SearchDuration())
-
-	return opts.exhaustive(results.Size(), results.TotalDocsCount()), nil
+	return false, nil
 }
 
 func (b *block) AggregateIter(ctx context.Context, aggOpts AggregateResultsOptions) (AggregateIterator, error) {
@@ -718,7 +663,32 @@ func (b *block) AggregateWithIter(
 	iter AggregateIterator,
 	opts QueryOptions,
 	results AggregateResults,
-	limit int) error {
+	limit int,
+	logFields []opentracinglog.Field,
+	) error {
+	ctx, sp := ctx.StartTraceSpan(tracepoint.BlockAggregate)
+	sp.LogFields(logFields...)
+	defer sp.Finish()
+
+	err := b.aggregateWithSpan(ctx, iter, opts, results, limit)
+
+	if err != nil {
+		sp.LogFields(opentracinglog.Error(err))
+	}
+	if iter.Done() {
+		b.metrics.aggregateDocsMatched.RecordValue(float64(results.TotalDocsCount()))
+		b.metrics.aggregateSeriesMatched.RecordValue(float64(results.Size()))
+	}
+
+	return err
+}
+func (b *block) aggregateWithSpan(
+	ctx context.Context,
+	iter AggregateIterator,
+	opts QueryOptions,
+	results AggregateResults,
+	limit int,
+	) error {
 	var (
 		count         int
 		err           error

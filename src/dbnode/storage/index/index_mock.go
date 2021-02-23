@@ -1097,17 +1097,17 @@ func (mr *MockBlockMockRecorder) Query(ctx, query, opts, results, logFields inte
 }
 
 // QueryWithIter mocks base method
-func (m *MockBlock) QueryWithIter(ctx context.Context, opts QueryOptions, docIter doc.Iterator, results DocumentResults, limit int) error {
+func (m *MockBlock) QueryWithIter(ctx context.Context, opts QueryOptions, docIter doc.QueryDocIterator, results DocumentResults, limit int, logFields []log.Field) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryWithIter", ctx, opts, docIter, results, limit)
+	ret := m.ctrl.Call(m, "QueryWithIter", ctx, opts, docIter, results, limit, logFields)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // QueryWithIter indicates an expected call of QueryWithIter
-func (mr *MockBlockMockRecorder) QueryWithIter(ctx, opts, docIter, results, limit interface{}) *gomock.Call {
+func (mr *MockBlockMockRecorder) QueryWithIter(ctx, opts, docIter, results, limit, logFields interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryWithIter", reflect.TypeOf((*MockBlock)(nil).QueryWithIter), ctx, opts, docIter, results, limit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryWithIter", reflect.TypeOf((*MockBlock)(nil).QueryWithIter), ctx, opts, docIter, results, limit, logFields)
 }
 
 // QueryIter mocks base method
@@ -1141,17 +1141,17 @@ func (mr *MockBlockMockRecorder) Aggregate(ctx, opts, results, logFields interfa
 }
 
 // AggregateWithIter mocks base method
-func (m *MockBlock) AggregateWithIter(ctx context.Context, iter AggregateIterator, opts QueryOptions, results AggregateResults, limit int) error {
+func (m *MockBlock) AggregateWithIter(ctx context.Context, iter AggregateIterator, opts QueryOptions, results AggregateResults, limit int, logFields []log.Field) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AggregateWithIter", ctx, iter, opts, results, limit)
+	ret := m.ctrl.Call(m, "AggregateWithIter", ctx, iter, opts, results, limit, logFields)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AggregateWithIter indicates an expected call of AggregateWithIter
-func (mr *MockBlockMockRecorder) AggregateWithIter(ctx, iter, opts, results, limit interface{}) *gomock.Call {
+func (mr *MockBlockMockRecorder) AggregateWithIter(ctx, iter, opts, results, limit, logFields interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AggregateWithIter", reflect.TypeOf((*MockBlock)(nil).AggregateWithIter), ctx, iter, opts, results, limit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AggregateWithIter", reflect.TypeOf((*MockBlock)(nil).AggregateWithIter), ctx, iter, opts, results, limit, logFields)
 }
 
 // AggregateIter mocks base method
